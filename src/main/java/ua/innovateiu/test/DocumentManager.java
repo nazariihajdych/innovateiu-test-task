@@ -4,7 +4,11 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * For implement this task focus on clear code, and make this solution as simple readable as possible
@@ -17,7 +21,7 @@ import java.util.*;
  */
 public class DocumentManager {
 
-    private final Map<String, Document> documentsStorage = new HashMap<>();
+    public final Map<String, Document> documentsStorage = new HashMap<>();
     private int idGenerator = 1;
 
     /**
@@ -30,10 +34,22 @@ public class DocumentManager {
 
     public Document save(Document document) {
         if (document.getId() == null) {
-            String id = String.valueOf(idGenerator++);
+            String id = String.valueOf(idGenerator);
             document.setId(id);
+        }else if (documentsStorage.containsKey(document.getId())){
+            if (documentsStorage.get(document.getId()).equals(document)) {
+                return document;
+            } else {
+                Document existingDocument = documentsStorage.get(document.getId());
+                existingDocument.setTitle(document.getTitle());
+                existingDocument.setContent(document.getContent());
+                existingDocument.setAuthor(document.getAuthor());
+                existingDocument.setCreated(document.getCreated());
+                return existingDocument;
+            }
         }
         documentsStorage.put(document.getId(), document);
+        idGenerator++;
         return document;
     }
 
@@ -44,8 +60,44 @@ public class DocumentManager {
      * @return list matched documents
      */
     public List<Document> search(SearchRequest request) {
+        return documentsStorage.values().stream()
+                .filter(document -> filterByTitlePrefixes(document, request.getTitlePrefixes()))
+                .filter(document -> filterByContainsContents(document, request.getContainsContents()))
+                .filter(document -> filterByAuthorIds(document, request.getAuthorIds()))
+                .filter(document -> filterByCreatedFrom(document, request.getCreatedFrom()))
+                .filter(document -> filterByCreatedTo(document, request.getCreatedTo()))
+                .collect(Collectors.toList());
+    }
 
-        return Collections.emptyList();
+    private boolean filterByTitlePrefixes(Document document, List<String> titlePrefixes) {
+        if (titlePrefixes == null || titlePrefixes.isEmpty()) return true;
+        for (String prefix : titlePrefixes) {
+            if (document.getTitle().startsWith(prefix)) return true;
+        }
+        return false;
+    }
+
+    private boolean filterByContainsContents(Document document, List<String> containsContents) {
+        if (containsContents == null || containsContents.isEmpty()) return true;
+        for (String content : containsContents) {
+            if (document.getContent().contains(content)) return true;
+        }
+        return false;
+    }
+
+    private boolean filterByAuthorIds(Document document, List<String> authorIds) {
+        if (authorIds == null || authorIds.isEmpty()) return true;
+        return authorIds.contains(document.getAuthor().getId());
+    }
+
+    private boolean filterByCreatedFrom(Document document, Instant createdFrom) {
+        if (createdFrom == null) return true;
+        return document.getCreated().isAfter(createdFrom) || document.getCreated().equals(createdFrom);
+    }
+
+    private boolean filterByCreatedTo(Document document, Instant createdTo) {
+        if (createdTo == null) return true;
+        return document.getCreated().isBefore(createdTo) || document.getCreated().equals(createdTo);
     }
 
     /**
